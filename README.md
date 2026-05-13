@@ -24,6 +24,24 @@ npm run build
 npm start
 ```
 
+## Deploy On Render (Free)
+
+Use the Render Blueprint in this repository:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/kisko/HantaVirusSpread)
+
+Manual settings (if needed):
+
+- Runtime: `Node`
+- Build Command: `npm ci && npm run build`
+- Start Command: `npm run start`
+- Node Version: `20`
+
+Notes:
+
+- The app currently uses a local SQLite file and server filesystem writes.
+- On free/ephemeral hosts, write operations may not be durable across restarts.
+
 ### Environment Variables
 
 Create `.env.local` (optional):
