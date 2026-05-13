@@ -13,12 +13,16 @@
 /.next/
 /out/
 
+# editor
+/.vscode/
+
 # production
 /build
 
 # misc
 .DS_Store
 *.pem
+*.sqlite
 
 # debug
 npm-debug.log*
