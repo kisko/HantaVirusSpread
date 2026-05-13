@@ -22,6 +22,10 @@ function nextLevel(current: WatchAlertLevel, candidate: WatchAlertLevel): WatchA
   return LEVEL_ORDER[candidate] < LEVEL_ORDER[current] ? candidate : current;
 }
 
+function maxIsoDate(current: string | null, candidate: string): string {
+  return current == null || candidate > current ? candidate : current;
+}
+
 export function buildWatchlistSummaries(
   watchedCountryCodes: string[],
   countries: CountryMeta[],
@@ -60,7 +64,7 @@ export function buildWatchlistSummaries(
       for (const record of countryConfirmed) {
         const diff = daysDiff(anchorDate, record.date);
         if (diff < 0) continue;
-        latestActivityDate = latestActivityDate == null || record.date > latestActivityDate ? record.date : latestActivityDate;
+        latestActivityDate = maxIsoDate(latestActivityDate, record.date);
         if (diff < 7) last7Confirmed += record.cases;
         if (diff >= 7 && diff < 14) prev7Confirmed += record.cases;
         if (diff < 28) last28Confirmed += record.cases;
@@ -69,7 +73,7 @@ export function buildWatchlistSummaries(
       for (const record of countrySignals) {
         const diff = daysDiff(anchorDate, record.date);
         if (diff < 0) continue;
-        latestActivityDate = latestActivityDate == null || record.date > latestActivityDate ? record.date : latestActivityDate;
+        latestActivityDate = maxIsoDate(latestActivityDate, record.date);
         if (diff < 7) last7Signals += 1;
         if (diff >= 7 && diff < 14) prev7Signals += 1;
         if (diff < 28) last28Signals += 1;
