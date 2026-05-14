@@ -1,3 +1,5 @@
+"use client";
+
 import type { ForecastSnapshot, PlaybackShiftMarker, PlaybackStep } from "@/types";
 
 interface PlaybackPanelProps {
@@ -53,22 +55,19 @@ export default function PlaybackPanel({
   const maxIndex = Math.max(steps.length - 1, 1);
 
   return (
-    <section className="frost-panel-strong absolute bottom-3 right-3 z-40 w-[min(370px,calc(100%-24px))] rounded-2xl neon-ring">
-      <div className="p-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-              <span className={`rounded-full px-2 py-0.5 ${activeStep.mode === "forecast" ? "bg-orange-400/20 text-orange-100" : "bg-cyan-400/20 text-cyan-100"}`}>
-                {activeStep.mode === "forecast" ? "Forecast" : "History"}
-              </span>
-              <span>
-                {activeIndex + 1}/{steps.length}
-              </span>
-            </div>
-            <p className="mt-0.5 truncate text-[11px] font-medium text-slate-200">{activeStep.date}</p>
+    <section className="absolute bottom-0 left-0 right-0 z-40 border-t border-cyan-300/35 bg-slate-950/95 shadow-[0_-12px_36px_rgba(2,6,23,0.68)] backdrop-blur-xl">
+      <div className="px-2.5 py-1">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
+          <div className="min-w-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-100">
+            <span className={`rounded-full px-2 py-0.5 ${activeStep.mode === "forecast" ? "bg-orange-400/20 text-orange-100" : "bg-cyan-400/20 text-cyan-100"}`}>
+              {activeStep.mode === "forecast" ? "Forecast" : "History"}
+            </span>
+            <span className="ml-2 text-slate-200">
+              {activeIndex + 1}/{steps.length}
+            </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center justify-center gap-0.5">
             <IconButton label="Go to start" onClick={onJumpToStart}>
               <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
                 <path d="M2 2h2v12H2zM6 8l8 6V2z" />
@@ -106,15 +105,17 @@ export default function PlaybackPanel({
               </svg>
             </IconButton>
           </div>
+
+          <p className="truncate text-right text-[11px] font-semibold text-slate-100">{activeStep.date}</p>
         </div>
 
-        <div className="mt-2">
-          <div className="mb-1 flex items-center justify-between text-[10px] text-slate-400">
+        <div className="mt-1">
+          <div className="mb-0.5 flex items-center justify-between text-[10px] font-medium text-slate-200">
             <span>Timeline shift stops</span>
             <span>{shiftMarkers.length} markers</span>
           </div>
-          <div className="relative pt-4">
-            <div className="pointer-events-none absolute left-0 right-0 top-0 h-4">
+          <div className="relative pt-2.5">
+            <div className="pointer-events-none absolute left-0 right-0 top-0 h-3.5">
               {shiftMarkers.map((marker) => {
                 const left = `${(marker.index / maxIndex) * 100}%`;
                 const tone =
@@ -127,12 +128,12 @@ export default function PlaybackPanel({
                 return (
                   <span
                     key={marker.index}
-                    className="absolute top-0 h-4 -translate-x-1/2"
+                    className="absolute top-0 h-3.5 -translate-x-1/2"
                     style={{ left }}
                     aria-hidden="true"
                   >
-                    <span className={`absolute left-1/2 top-0 h-2.5 w-px -translate-x-1/2 bg-slate-500`} />
-                    <span className={`absolute left-1/2 top-2 h-2 w-2 -translate-x-1/2 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.18)] ${tone}`} />
+                    <span className={`absolute left-1/2 top-0 h-2 w-px -translate-x-1/2 bg-slate-500`} />
+                    <span className={`absolute left-1/2 top-1.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.18)] ${tone}`} />
                   </span>
                 );
               })}
@@ -147,29 +148,13 @@ export default function PlaybackPanel({
               aria-label="Playback timeline"
             />
           </div>
-          {shiftMarkers.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {shiftMarkers.map((marker) => (
-                <button
-                  key={marker.index}
-                  type="button"
-                  onClick={() => onIndexChange(marker.index)}
-                  className={`rounded-full border px-1.5 py-0.5 text-[10px] transition ${marker.index === activeStep.index ? "border-cyan-300/70 bg-cyan-400/22 text-cyan-100" : "border-slate-600/70 bg-slate-900/65 text-slate-300 hover:border-cyan-300/55 hover:text-cyan-100"}`}
-                  aria-label={`Jump to shift on ${marker.date}: ${marker.label}`}
-                  title={`${marker.date}: ${marker.label}`}
-                >
-                  {marker.date.slice(5)}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="mt-1.5 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1 text-[10px] text-slate-500">
+          <div className="mt-0.5 flex items-center justify-between gap-1.5 overflow-hidden text-[10px] whitespace-nowrap">
+            <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto text-slate-200">
               {milestones.map((step) => (
                 <button
                   key={step.index}
                   onClick={() => onIndexChange(step.index)}
-                  className={`rounded-full px-1.5 py-0.5 transition ${step.index === activeStep.index ? "bg-cyan-400/25 text-cyan-100" : "bg-slate-800/85 text-slate-300 hover:bg-slate-700"}`}
+                  className={`rounded-full px-1.5 py-[1px] transition ${step.index === activeStep.index ? "bg-cyan-400/25 text-cyan-100" : "bg-slate-800/90 text-slate-200 hover:bg-slate-700"}`}
                   aria-label={`Jump to ${step.label}`}
                 >
                   {step.mode === "forecast" ? step.label : step.date.slice(5)}
@@ -177,27 +162,27 @@ export default function PlaybackPanel({
               ))}
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex flex-shrink-0 items-center gap-1">
               <IconButton label="Speed down" onClick={onSpeedDown}>
                 <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
                   <path d="M3 7h10v2H3z" />
                 </svg>
               </IconButton>
-              <span className="w-10 text-center text-[10px] font-semibold text-slate-300">{speedLabel}</span>
+              <span className="w-8 text-center text-[10px] font-semibold text-slate-100">{speedLabel}</span>
               <IconButton label="Speed up" onClick={onSpeedUp}>
                 <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
                   <path d="M7 3h2v4h4v2H9v4H7V9H3V7h4z" />
                 </svg>
               </IconButton>
             </div>
+
+            <p className="hidden flex-shrink-0 text-[10px] text-slate-100 md:block">
+              {activeStep.mode === "forecast"
+                ? `Projected ${forecast?.daysAhead ?? activeStep.offsetDays}d ahead`
+                : `${activeWindowDays}-day trailing window`}
+            </p>
           </div>
         </div>
-
-        <p className="mt-1 text-[10px] text-slate-300">
-          {activeStep.mode === "forecast"
-            ? `Projected ${forecast?.daysAhead ?? activeStep.offsetDays} days ahead.`
-            : `${activeWindowDays}-day trailing window.`}
-        </p>
       </div>
     </section>
   );
@@ -217,7 +202,7 @@ function IconButton({ label, onClick, emphasized = false, children }: IconButton
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`flex h-6.5 w-6.5 items-center justify-center rounded-full border transition ${
+      className={`flex h-5.5 w-5.5 items-center justify-center rounded-full border transition ${
         emphasized
           ? "border-cyan-300/70 bg-cyan-400/25 text-cyan-50 hover:bg-cyan-400/35"
           : "border-slate-600/80 bg-slate-900/70 text-slate-100 hover:border-cyan-300/70 hover:text-cyan-100"

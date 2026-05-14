@@ -105,8 +105,17 @@ export default function MapView({
         },
         center,
         zoom,
+        pitch: 0,
+        bearing: 0,
+        dragRotate: false,
+        pitchWithRotate: false,
+        touchPitch: false,
         attributionControl: false,
       });
+
+      // Keep the map strictly top-down: disable rotate gestures and compass rotation.
+      map.touchZoomRotate.disableRotation();
+      map.keyboard.disableRotation();
 
       map.on("load", () => {
         if (!destroyed) {
@@ -131,10 +140,10 @@ export default function MapView({
   useEffect(() => {
     if (!mapRef.current || !mapReady) return;
     const map = mapRef.current as {
-      flyTo: (opts: { center: [number, number]; zoom: number }) => void;
+      flyTo: (opts: { center: [number, number]; zoom: number; pitch: number; bearing: number }) => void;
     };
     if (filter.norwayLens) {
-      map.flyTo({ center: [17.8886, 64.5731], zoom: 4.5 });
+      map.flyTo({ center: [17.8886, 64.5731], zoom: 4.5, pitch: 0, bearing: 0 });
     }
   }, [filter.norwayLens, mapReady]);
 
@@ -142,11 +151,14 @@ export default function MapView({
   useEffect(() => {
     if (!mapRef.current || !mapReady) return;
 
+    let cancelled = false;
+
     (async () => {
       const maplibregl = (await import("maplibre-gl")).default;
-      const map = mapRef.current as {
-        getCanvas: () => HTMLCanvasElement;
-      };
+      if (cancelled) return;
+
+      const map = mapRef.current as { getCanvas: () => HTMLCanvasElement } | null;
+      if (!map) return;
 
       // Remove old markers
       for (const m of markersRef.current) {
@@ -174,6 +186,8 @@ export default function MapView({
             if (e.key === "Enter" || e.key === " ") onCountryClick(country.countryCode);
           });
 
+          if (cancelled || !mapRef.current) return;
+
           const marker = new maplibregl.Marker({ element: el })
             .setLngLat([markerPosition.lon, markerPosition.lat]);
           marker.addTo(map as Parameters<typeof marker.addTo>[0]);
@@ -199,6 +213,8 @@ export default function MapView({
               ? markerPosition.lon + 0.8
               : markerPosition.lon;
 
+          if (cancelled || !mapRef.current) return;
+
           const marker = new maplibregl.Marker({ element: el })
             .setLngLat([offsetLon, markerPosition.lat]);
           marker.addTo(map as Parameters<typeof marker.addTo>[0]);
@@ -206,6 +222,10 @@ export default function MapView({
         }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapReady, confirmedRecords, signalRecords, filter.showConfirmed, filter.showSignals, selectedCountryCode]);
 

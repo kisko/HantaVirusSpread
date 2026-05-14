@@ -12,6 +12,7 @@ import PlaybackPanel from "@/components/PlaybackPanel";
 import WatchlistPanel from "@/components/WatchlistPanel";
 import { buildPlaybackShiftMarkers, buildPlaybackSteps, getDisplayDataForPlayback, getLatestObservedDate, HISTORY_PLAYBACK_DAYS } from "@/lib/playback";
 import { buildWatchlistSummaries } from "@/lib/watchlist";
+import { useDraggablePanel } from "@/components/useDraggablePanel";
 
 // Client-only map import (avoids SSR window errors)
 const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
@@ -41,6 +42,8 @@ export default function HomePage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [watchedCountryCodes, setWatchedCountryCodes] = useState<string[]>([]);
+  const { panelStyle: overviewPanelStyle, isDragging: isOverviewDragging, handleProps: overviewHandleProps } =
+    useDraggablePanel("hantaspread.panel.overview");
 
   useEffect(() => {
     try {
@@ -202,12 +205,38 @@ export default function HomePage() {
         <div aria-hidden="true" className="pointer-events-none absolute left-[-180px] top-[-150px] z-0 h-80 w-80 rounded-full bg-cyan-400/18 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute bottom-[-180px] right-[-80px] z-0 h-96 w-96 rounded-full bg-orange-400/16 blur-3xl" />
 
-        <div className="frost-panel animate-rise-in absolute left-4 right-4 top-4 z-30 rounded-xl px-3 py-2 text-xs font-medium text-amber-100 sm:right-auto sm:w-[500px]">
+        <div className="frost-panel animate-rise-in absolute left-4 right-4 top-4 z-50 rounded-xl px-3 py-2 text-xs font-medium text-amber-100 sm:right-auto sm:w-[500px]">
           Not medical advice; do not infer local risk from mentions; official counts come from ECDC/national agencies.
         </div>
 
-        <section className="frost-panel-strong animate-rise-in absolute left-4 top-20 z-30 hidden w-[340px] rounded-2xl p-3 lg:block">
-          <h2 className="font-display text-sm font-semibold text-cyan-100">HantaSpread Global Overview</h2>
+        <section
+          className="frost-panel-strong absolute left-4 top-20 z-50 hidden w-[340px] rounded-2xl p-3 lg:block"
+          style={overviewPanelStyle}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-display text-sm font-semibold text-cyan-100">HantaSpread Global Overview</h2>
+            <button
+              type="button"
+              aria-label="Move overview panel"
+              title="Drag to move overview panel"
+              className={`flex h-6 w-6 touch-none select-none items-center justify-center rounded-full border border-cyan-300/35 text-cyan-100 transition ${
+                isOverviewDragging ? "cursor-grabbing bg-cyan-400/28" : "cursor-grab bg-cyan-400/14 hover:bg-cyan-400/24"
+              }`}
+              {...overviewHandleProps}
+            >
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+                <circle cx="4" cy="4" r="1.1" />
+                <circle cx="8" cy="4" r="1.1" />
+                <circle cx="12" cy="4" r="1.1" />
+                <circle cx="4" cy="8" r="1.1" />
+                <circle cx="8" cy="8" r="1.1" />
+                <circle cx="12" cy="8" r="1.1" />
+                <circle cx="4" cy="12" r="1.1" />
+                <circle cx="8" cy="12" r="1.1" />
+                <circle cx="12" cy="12" r="1.1" />
+              </svg>
+            </button>
+          </div>
           <div className="mt-2 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl border border-cyan-300/20 bg-slate-900/60 p-2">
               <div className="text-[10px] uppercase tracking-[0.12em] text-slate-400">Latest Cases</div>

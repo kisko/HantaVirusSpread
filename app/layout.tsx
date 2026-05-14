@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Exo_2, Space_Grotesk } from "next/font/google";
+import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 
 const exo = Exo_2({

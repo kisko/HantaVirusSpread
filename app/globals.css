@@ -2,17 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/* MapLibre GL styles */
-@import "maplibre-gl/dist/maplibre-gl.css";
-
 :root {
   --confirmed-color: #38bdf8;
   --signal-color: #f97316;
   --accent-color: #22d3ee;
   --bg-0: #030711;
   --bg-1: #0a1122;
-  --surface: rgba(15, 23, 42, 0.6);
-  --surface-strong: rgba(15, 23, 42, 0.82);
+  --surface: rgba(15, 23, 42, 0.72);
+  --surface-strong: rgba(15, 23, 42, 0.9);
   --border-soft: rgba(148, 163, 184, 0.28);
   --text-main: #dbeafe;
   --text-muted: #94a3b8;
@@ -85,6 +82,8 @@ input[type="range"] {
   border: 1px solid var(--border-soft);
   box-shadow: 0 20px 45px rgba(2, 6, 23, 0.45);
   backdrop-filter: blur(12px);
+  color: #e5edf9;
+  text-shadow: 0 1px 1px rgba(2, 6, 23, 0.65);
 }
 
 .frost-panel-strong {
@@ -92,6 +91,19 @@ input[type="range"] {
   border: 1px solid rgba(148, 163, 184, 0.34);
   box-shadow: 0 24px 50px rgba(2, 6, 23, 0.5);
   backdrop-filter: blur(14px);
+  color: #e5edf9;
+  text-shadow: 0 1px 1px rgba(2, 6, 23, 0.65);
+}
+
+/* Lift muted utility text when rendered on translucent panels. */
+.frost-panel .text-slate-400,
+.frost-panel-strong .text-slate-400 {
+  color: #cbd5e1;
+}
+
+.frost-panel .text-slate-300,
+.frost-panel-strong .text-slate-300 {
+  color: #e2e8f0;
 }
 
 .neon-ring {
