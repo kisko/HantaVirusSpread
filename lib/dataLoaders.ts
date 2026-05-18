@@ -1,6 +1,7 @@
 import type { ConfirmedCaseRecord, CountryEventRecord, CountryMeta, SignalRecord } from "@/types";
 import { getConfirmedCases, getCountries, getEvents, getSignals, upsertSignalsFromFeed } from "@/lib/storage";
 import { fetchSignalsFeed, withSignalsSyncCache } from "@/lib/ingestion/signals";
+import { extractRegionFromSignal } from "@/lib/regionExtractor";
 
 /** Return records within the last `days` days from today. */
 export function filterByDays<T extends { date: string }>(records: T[], days: number): T[] {
@@ -39,5 +40,11 @@ async function maybeSyncSignalsFromUrl(): Promise<void> {
 
 export async function loadSignals(): Promise<SignalRecord[]> {
   await maybeSyncSignalsFromUrl();
-  return getSignals();
+  const signals = await getSignals();
+  
+  // Extract region information for better localization
+  return signals.map((signal) => ({
+    ...signal,
+    region: signal.region || extractRegionFromSignal(signal.title, signal.snippet),
+  }));
 }

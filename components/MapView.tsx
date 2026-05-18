@@ -8,6 +8,8 @@ interface MapViewProps {
   signalRecords: SignalRecord[];
   countries: CountryMeta[];
   filter: MapFilter;
+  playbackFrameKey?: string;
+  onPlaybackFrameReady?: (frameKey: string) => void;
   onCountryClick: (code: string) => void;
   selectedCountryCode: string | null;
 }
@@ -18,6 +20,30 @@ interface CountryMarker {
   confirmedTotal: number;
   signalCount: number;
 }
+
+interface CountryRiskSummary {
+  confirmedTotal: number;
+  signalCount: number;
+  riskScore: number;
+  visibleActivity: number;
+}
+
+interface GeoJsonFeature {
+  type: "Feature";
+  properties?: Record<string, unknown>;
+  geometry: unknown;
+  id?: string | number;
+}
+
+interface GeoJsonFeatureCollection {
+  type: "FeatureCollection";
+  features: GeoJsonFeature[];
+}
+
+const COUNTRY_POLYGONS_URL = "https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson";
+const COUNTRY_SOURCE_ID = "country-polygons";
+const COUNTRY_FILL_LAYER_ID = "country-risk-fill";
+const COUNTRY_BORDER_LAYER_ID = "country-risk-border";
 
 const MARKER_POSITION_OVERRIDES: Partial<Record<string, { lat: number; lon: number }>> = {
   // Geographic centroids can look wrong for long, irregular countries.
@@ -54,18 +80,153 @@ function buildMarkers(
   );
 }
 
+function normalizeCountryCode(rawCode: string | null | undefined): string | null {
+  if (!rawCode) return null;
+  const code = rawCode.toUpperCase();
+  if (code === "UK") return "GB";
+  if (code === "EL") return "GR";
+  if (code === "XK") return "XK";
+  if (/^[A-Z]{2}$/.test(code)) return code;
+  return null;
+}
+
+function normalizeCountryName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getFeatureCountryCode(
+  feature: GeoJsonFeature,
+  countryNameToCode: Map<string, string>
+): string | null {
+  const properties = feature.properties ?? {};
+  const candidates = [
+    properties.ISO_A2,
+    properties.iso_a2,
+    properties.ISO2,
+    properties.iso2,
+    properties["ISO3166-1-Alpha-2"],
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string") {
+      const normalized = normalizeCountryCode(candidate);
+      if (normalized) return normalized;
+    }
+  }
+
+  const nameCandidates = [properties.name, properties.NAME, properties.ADMIN];
+  for (const candidate of nameCandidates) {
+    if (typeof candidate !== "string") continue;
+    const code = countryNameToCode.get(normalizeCountryName(candidate));
+    if (code) return code;
+  }
+
+  return null;
+}
+
+function normalizeLogValue(value: number, maxValue: number): number {
+  if (value <= 0 || maxValue <= 0) return 0;
+  const normalized = Math.log10(value + 1) / Math.log10(maxValue + 1);
+  return Math.max(0, Math.min(1, normalized));
+}
+
+function buildCountryRiskByCode(
+  confirmed: ConfirmedCaseRecord[],
+  signals: SignalRecord[],
+  countries: CountryMeta[],
+  filter: MapFilter
+): Map<string, CountryRiskSummary> {
+  const map = new Map<string, CountryRiskSummary>();
+
+  for (const country of countries) {
+    map.set(country.countryCode, {
+      confirmedTotal: 0,
+      signalCount: 0,
+      riskScore: 0,
+      visibleActivity: 0,
+    });
+  }
+
+  for (const record of confirmed) {
+    const existing = map.get(record.countryCode);
+    if (!existing) continue;
+    existing.confirmedTotal += record.cases;
+  }
+
+  for (const record of signals) {
+    const existing = map.get(record.countryCode);
+    if (!existing) continue;
+    existing.signalCount += 1;
+  }
+
+  const values = Array.from(map.values());
+  const maxConfirmed = values.reduce((max, item) => Math.max(max, item.confirmedTotal), 0);
+  const maxSignals = values.reduce((max, item) => Math.max(max, item.signalCount), 0);
+
+  const confirmedWeight = filter.showConfirmed ? 0.7 : 0;
+  const signalWeight = filter.showSignals ? 0.3 : 0;
+  const weightSum = confirmedWeight + signalWeight;
+
+  for (const value of values) {
+    const confirmedScore = confirmedWeight > 0 ? normalizeLogValue(value.confirmedTotal, maxConfirmed) * confirmedWeight : 0;
+    const signalScore = signalWeight > 0 ? normalizeLogValue(value.signalCount, maxSignals) * signalWeight : 0;
+    const hasVisibleActivity =
+      (filter.showConfirmed && value.confirmedTotal > 0) ||
+      (filter.showSignals && value.signalCount > 0);
+    const baseRiskScore = weightSum > 0 ? (confirmedScore + signalScore) / weightSum : 0;
+
+    value.visibleActivity = hasVisibleActivity ? 1 : 0;
+    value.riskScore = hasVisibleActivity ? Math.max(baseRiskScore, 0.18) : 0;
+  }
+
+  return map;
+}
+
+function buildRiskGeoJson(
+  base: GeoJsonFeatureCollection,
+  riskByCode: Map<string, CountryRiskSummary>,
+  countryNameToCode: Map<string, string>
+): GeoJsonFeatureCollection {
+  const features = base.features.map((feature) => {
+    const countryCode = getFeatureCountryCode(feature, countryNameToCode);
+    const risk = countryCode ? riskByCode.get(countryCode) : undefined;
+
+    return {
+      ...feature,
+      properties: {
+        ...(feature.properties ?? {}),
+        riskScore: risk?.riskScore ?? 0,
+        confirmedTotal: risk?.confirmedTotal ?? 0,
+        signalCount: risk?.signalCount ?? 0,
+        visibleActivity: risk?.visibleActivity ?? 0,
+      },
+    };
+  });
+
+  return { type: "FeatureCollection", features };
+}
+
 export default function MapView({
   confirmedRecords,
   signalRecords,
   countries,
   filter,
+  playbackFrameKey,
+  onPlaybackFrameReady,
   onCountryClick,
   selectedCountryCode,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
   const markersRef = useRef<unknown[]>([]);
+  const countryPolygonsRef = useRef<GeoJsonFeatureCollection | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const countryNameToCode = new Map(
+    countries.map((country) => [normalizeCountryName(country.countryName), country.countryCode])
+  );
 
   // Dynamically import MapLibre to avoid SSR issues
   useEffect(() => {
@@ -119,6 +280,102 @@ export default function MapView({
 
       map.on("load", () => {
         if (!destroyed) {
+          const mapWithLayers = map as {
+            addSource: (id: string, source: unknown) => void;
+            addLayer: (layer: unknown) => void;
+          };
+
+          mapWithLayers.addSource(COUNTRY_SOURCE_ID, {
+            type: "geojson",
+            data: { type: "FeatureCollection", features: [] },
+          });
+
+          mapWithLayers.addLayer({
+            id: COUNTRY_FILL_LAYER_ID,
+            type: "fill",
+            source: COUNTRY_SOURCE_ID,
+            paint: {
+              "fill-color": [
+                "interpolate",
+                ["linear"],
+                ["coalesce", ["get", "riskScore"], 0],
+                0,
+                "#0891b2",
+                0.35,
+                "#22c55e",
+                0.7,
+                "#f59e0b",
+                1,
+                "#ef4444",
+              ],
+              "fill-opacity": [
+                "case",
+                [">", ["coalesce", ["get", "visibleActivity"], 0], 0],
+                [
+                  "interpolate",
+                  ["linear"],
+                  ["coalesce", ["get", "riskScore"], 0],
+                  0,
+                  0.18,
+                  0.5,
+                  0.3,
+                  1,
+                  0.44,
+                ],
+                0,
+              ],
+            },
+          });
+
+          mapWithLayers.addLayer({
+            id: COUNTRY_BORDER_LAYER_ID,
+            type: "line",
+            source: COUNTRY_SOURCE_ID,
+            paint: {
+              "line-color": [
+                "interpolate",
+                ["linear"],
+                ["coalesce", ["get", "riskScore"], 0],
+                0,
+                "#475569",
+                0.3,
+                "#06b6d4",
+                0.65,
+                "#f59e0b",
+                1,
+                "#f97316",
+              ],
+              "line-opacity": [
+                "case",
+                [">", ["coalesce", ["get", "visibleActivity"], 0], 0],
+                [
+                  "interpolate",
+                  ["linear"],
+                  ["coalesce", ["get", "riskScore"], 0],
+                  0,
+                  0.55,
+                  1,
+                  0.92,
+                ],
+                0.2,
+              ],
+              "line-width": [
+                "case",
+                [">", ["coalesce", ["get", "visibleActivity"], 0], 0],
+                [
+                  "interpolate",
+                  ["linear"],
+                  ["coalesce", ["get", "riskScore"], 0],
+                  0,
+                  0.7,
+                  1,
+                  1.8,
+                ],
+                0.25,
+              ],
+            },
+          });
+
           (mapRef as React.MutableRefObject<unknown>).current = map;
           setMapReady(true);
         }
@@ -147,6 +404,45 @@ export default function MapView({
     }
   }, [filter.norwayLens, mapReady]);
 
+  // Update country risk polygons whenever visible data changes.
+  useEffect(() => {
+    if (!mapRef.current || !mapReady) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const map = mapRef.current as {
+        getSource: (id: string) => { setData: (data: unknown) => void } | undefined;
+      };
+
+      const source = map.getSource(COUNTRY_SOURCE_ID);
+      if (!source) return;
+
+      if (!countryPolygonsRef.current) {
+        try {
+          const response = await fetch(COUNTRY_POLYGONS_URL);
+          if (!response.ok) return;
+          const data = (await response.json()) as GeoJsonFeatureCollection;
+          if (!cancelled) {
+            countryPolygonsRef.current = data;
+          }
+        } catch {
+          return;
+        }
+      }
+
+      if (cancelled || !countryPolygonsRef.current) return;
+
+      const riskByCode = buildCountryRiskByCode(confirmedRecords, signalRecords, countries, filter);
+      const enriched = buildRiskGeoJson(countryPolygonsRef.current, riskByCode, countryNameToCode);
+      source.setData(enriched);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapReady, confirmedRecords, signalRecords, countries, filter]);
+
   // Add / refresh markers when data or filters change
   useEffect(() => {
     if (!mapRef.current || !mapReady) return;
@@ -157,7 +453,10 @@ export default function MapView({
       const maplibregl = (await import("maplibre-gl")).default;
       if (cancelled) return;
 
-      const map = mapRef.current as { getCanvas: () => HTMLCanvasElement } | null;
+      const map = mapRef.current as {
+        getCanvas: () => HTMLCanvasElement;
+        once: (event: "idle", listener: () => void) => void;
+      } | null;
       if (!map) return;
 
       // Remove old markers
@@ -221,13 +520,21 @@ export default function MapView({
           markersRef.current.push(marker);
         }
       }
+
+      if (playbackFrameKey && onPlaybackFrameReady && !cancelled) {
+        map.once("idle", () => {
+          if (!cancelled) {
+            onPlaybackFrameReady(playbackFrameKey);
+          }
+        });
+      }
     })();
 
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, confirmedRecords, signalRecords, filter.showConfirmed, filter.showSignals, selectedCountryCode]);
+  }, [mapReady, confirmedRecords, signalRecords, filter.showConfirmed, filter.showSignals, selectedCountryCode, playbackFrameKey, onPlaybackFrameReady]);
 
   return (
     <div ref={containerRef} className="w-full h-full" aria-label="Hantavirus activity map" role="application" />

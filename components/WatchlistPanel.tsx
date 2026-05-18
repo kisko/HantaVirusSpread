@@ -11,6 +11,7 @@ interface WatchlistPanelProps {
   onAddCountry: (countryCode: string) => void;
   onRemoveCountry: (countryCode: string) => void;
   onSelectCountry: (countryCode: string) => void;
+  onClose?: () => void;
 }
 
 const LEVEL_STYLES: Record<WatchlistCountrySummary["level"], string> = {
@@ -27,6 +28,7 @@ export default function WatchlistPanel({
   onAddCountry,
   onRemoveCountry,
   onSelectCountry,
+  onClose,
 }: WatchlistPanelProps) {
   const [countryToAdd, setCountryToAdd] = useState("");
   const { panelStyle, isDragging, handleProps } = useDraggablePanel("hantaspread.panel.watchlist");
@@ -72,6 +74,19 @@ export default function WatchlistPanel({
               <circle cx="12" cy="12" r="1.1" />
             </svg>
           </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Hide watchlist panel"
+              title="Hide watchlist panel"
+              className="flex h-6 w-6 touch-none select-none items-center justify-center rounded-full border border-cyan-300/35 text-cyan-100 transition hover:bg-red-500/30 bg-cyan-400/14 hover:border-red-400/60"
+            >
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+                <path d="M12.207 3.793L8.707 7.293l3.5 3.5-.707.707L8 8.707l-3.5 3.5-.707-.707 3.5-3.5-3.5-3.5.707-.707L8 7.293l3.5-3.5.707.707Z" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 

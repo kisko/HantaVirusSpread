@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
-import type { MapFilter, ConfirmedCaseRecord, SignalRecord, CountryMeta, DashboardOverview } from "@/types";
+import type { MapFilter, ConfirmedCaseRecord, SignalRecord, CountryMeta, DashboardOverview, PanelVisibility } from "@/types";
 import TopBar from "@/components/TopBar";
 import Legend from "@/components/Legend";
 import Footer from "@/components/Footer";
@@ -26,13 +26,23 @@ const DEFAULT_FILTER: MapFilter = {
   norwayLens: false,
 };
 
+const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
+  legend: true,
+  watchlist: true,
+  norwayRisk: true,
+  overview: true,
+};
+
 export default function HomePage() {
   const [filter, setFilter] = useState<MapFilter>(DEFAULT_FILTER);
+  const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(DEFAULT_PANEL_VISIBILITY);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [playbackIndex, setPlaybackIndex] = useState(HISTORY_PLAYBACK_DAYS - 1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeedIndex, setPlaybackSpeedIndex] = useState(1);
+  const [renderedPlaybackFrameKey, setRenderedPlaybackFrameKey] = useState<string | null>(null);
 
   const [confirmed, setConfirmed] = useState<ConfirmedCaseRecord[]>([]);
   const [signals, setSignals] = useState<SignalRecord[]>([]);
@@ -61,6 +71,25 @@ export default function HomePage() {
   useEffect(() => {
     window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(watchedCountryCodes));
   }, [watchedCountryCodes]);
+
+  // Load panel visibility from localStorage
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("hantaspread.panelVisibility");
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      if (typeof parsed === "object" && parsed !== null) {
+        setPanelVisibility((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // Use defaults
+    }
+  }, []);
+
+  // Save panel visibility to localStorage
+  useEffect(() => {
+    window.localStorage.setItem("hantaspread.panelVisibility", JSON.stringify(panelVisibility));
+  }, [panelVisibility]);
 
   // Load country list once on mount
   useEffect(() => {
@@ -124,6 +153,7 @@ export default function HomePage() {
     offsetDays: 0,
     label: latestObservedDate,
   };
+  const activePlaybackFrameKey = `${activeStep.mode}:${activeStep.date}`;
 
   const displayData = useMemo(
     () =>
@@ -144,9 +174,52 @@ export default function HomePage() {
   );
 
   useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return target.isContentEditable || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    };
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
+      const key = event.key.toLowerCase();
+
+      if (key === " " || key === "k") {
+        event.preventDefault();
+        if (playbackIndex >= playbackSteps.length - 1) {
+          setPlaybackIndex(0);
+          setIsPlaying(true);
+          return;
+        }
+        setIsPlaying((current) => !current);
+        return;
+      }
+
+      if (key === "j") {
+        event.preventDefault();
+        setIsPlaying(false);
+        setPlaybackIndex((current) => Math.max(current - 1, 0));
+        return;
+      }
+
+      if (key === "l") {
+        event.preventDefault();
+        setIsPlaying(false);
+        setPlaybackIndex((current) => Math.min(current + 1, Math.max(playbackSteps.length - 1, 0)));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  }, [playbackIndex, playbackSteps.length]);
+
+  useEffect(() => {
     if (!isPlaying || playbackSteps.length === 0) return;
     if (playbackIndex >= playbackSteps.length - 1) {
       setIsPlaying(false);
+      return;
+    }
+    if (renderedPlaybackFrameKey !== activePlaybackFrameKey) {
       return;
     }
 
@@ -158,7 +231,15 @@ export default function HomePage() {
     }, delay);
 
     return () => window.clearTimeout(timer);
-  }, [activeStep.mode, isPlaying, playbackIndex, playbackSpeedIndex, playbackSteps.length]);
+  }, [
+    activePlaybackFrameKey,
+    activeStep.mode,
+    isPlaying,
+    playbackIndex,
+    playbackSpeedIndex,
+    playbackSteps.length,
+    renderedPlaybackFrameKey,
+  ]);
 
   const updateFilter = useCallback((partial: Partial<MapFilter>) => {
     setFilter((prev) => ({ ...prev, ...partial }));
@@ -198,6 +279,10 @@ export default function HomePage() {
           setSearchQuery("");
         }}
         countryNameToCode={countryNameToCode}
+        panelVisibility={panelVisibility}
+        onPanelVisibilityChange={(panel, visible) => {
+          setPanelVisibility((prev) => ({ ...prev, [panel]: visible }));
+        }}
       />
 
       {/* Map area */}
@@ -205,37 +290,62 @@ export default function HomePage() {
         <div aria-hidden="true" className="pointer-events-none absolute left-[-180px] top-[-150px] z-0 h-80 w-80 rounded-full bg-cyan-400/18 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute bottom-[-180px] right-[-80px] z-0 h-96 w-96 rounded-full bg-orange-400/16 blur-3xl" />
 
-        <div className="frost-panel animate-rise-in absolute left-4 right-4 top-4 z-50 rounded-xl px-3 py-2 text-xs font-medium text-amber-100 sm:right-auto sm:w-[500px]">
-          Not medical advice; do not infer local risk from mentions; official counts come from ECDC/national agencies.
-        </div>
+        {showDisclaimer && (
+          <div className="frost-panel animate-rise-in absolute left-4 right-4 top-4 z-50 rounded-xl px-3 py-2 text-xs font-medium text-amber-100 sm:right-auto sm:w-[500px] flex items-start justify-between gap-2">
+            <span>Not medical advice; do not infer local risk from mentions; official counts come from ECDC/national agencies.</span>
+            <button
+              type="button"
+              onClick={() => setShowDisclaimer(false)}
+              aria-label="Close disclaimer"
+              className="flex-shrink-0 text-amber-200 hover:text-amber-50 transition"
+            >
+              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                <path d="M12.207 3.793L8.707 7.293l3.5 3.5-.707.707L8 8.707l-3.5 3.5-.707-.707 3.5-3.5-3.5-3.5.707-.707L8 7.293l3.5-3.5.707.707Z" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         <section
-          className="frost-panel-strong absolute left-4 top-20 z-50 hidden w-[340px] rounded-2xl p-3 lg:block"
+          className={`frost-panel-strong absolute left-4 top-20 z-50 hidden w-[340px] rounded-2xl p-3 lg:block ${!panelVisibility.overview ? "hidden" : ""}`}
           style={overviewPanelStyle}
         >
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-display text-sm font-semibold text-cyan-100">HantaSpread Global Overview</h2>
-            <button
-              type="button"
-              aria-label="Move overview panel"
-              title="Drag to move overview panel"
-              className={`flex h-6 w-6 touch-none select-none items-center justify-center rounded-full border border-cyan-300/35 text-cyan-100 transition ${
-                isOverviewDragging ? "cursor-grabbing bg-cyan-400/28" : "cursor-grab bg-cyan-400/14 hover:bg-cyan-400/24"
-              }`}
-              {...overviewHandleProps}
-            >
-              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
-                <circle cx="4" cy="4" r="1.1" />
-                <circle cx="8" cy="4" r="1.1" />
-                <circle cx="12" cy="4" r="1.1" />
-                <circle cx="4" cy="8" r="1.1" />
-                <circle cx="8" cy="8" r="1.1" />
-                <circle cx="12" cy="8" r="1.1" />
-                <circle cx="4" cy="12" r="1.1" />
-                <circle cx="8" cy="12" r="1.1" />
-                <circle cx="12" cy="12" r="1.1" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Move overview panel"
+                title="Drag to move overview panel"
+                className={`flex h-6 w-6 touch-none select-none items-center justify-center rounded-full border border-cyan-300/35 text-cyan-100 transition ${
+                  isOverviewDragging ? "cursor-grabbing bg-cyan-400/28" : "cursor-grab bg-cyan-400/14 hover:bg-cyan-400/24"
+                }`}
+                {...overviewHandleProps}
+              >
+                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+                  <circle cx="4" cy="4" r="1.1" />
+                  <circle cx="8" cy="4" r="1.1" />
+                  <circle cx="12" cy="4" r="1.1" />
+                  <circle cx="4" cy="8" r="1.1" />
+                  <circle cx="8" cy="8" r="1.1" />
+                  <circle cx="12" cy="8" r="1.1" />
+                  <circle cx="4" cy="12" r="1.1" />
+                  <circle cx="8" cy="12" r="1.1" />
+                  <circle cx="12" cy="12" r="1.1" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPanelVisibility((prev) => ({ ...prev, overview: false }))}
+                aria-label="Hide overview panel"
+                title="Hide overview panel"
+                className="flex h-6 w-6 touch-none select-none items-center justify-center rounded-full border border-cyan-300/35 text-cyan-100 transition hover:bg-red-500/30 bg-cyan-400/14 hover:border-red-400/60"
+              >
+                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+                  <path d="M12.207 3.793L8.707 7.293l3.5 3.5-.707.707L8 8.707l-3.5 3.5-.707-.707 3.5-3.5-3.5-3.5.707-.707L8 7.293l3.5-3.5.707.707Z" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div className="mt-2 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl border border-cyan-300/20 bg-slate-900/60 p-2">
@@ -271,6 +381,8 @@ export default function HomePage() {
           signalRecords={displayData.signals}
           countries={countries}
           filter={filter}
+          playbackFrameKey={activePlaybackFrameKey}
+          onPlaybackFrameReady={setRenderedPlaybackFrameKey}
           onCountryClick={(code) => {
             setSelectedCountry(code);
           }}
@@ -321,21 +433,24 @@ export default function HomePage() {
           }}
         />
 
-        <Legend />
+        {panelVisibility.legend && <Legend onClose={() => setPanelVisibility((prev) => ({ ...prev, legend: false }))} />}
 
-        <WatchlistPanel
-          summaries={watchlistSummaries}
-          countries={countries}
-          watchedCountryCodes={watchedCountryCodes}
-          onAddCountry={(code) => {
-            addWatchedCountry(code);
-            setSelectedCountry(code);
-          }}
-          onRemoveCountry={removeWatchedCountry}
-          onSelectCountry={(code) => setSelectedCountry(code)}
-        />
+        {panelVisibility.watchlist && (
+          <WatchlistPanel
+            summaries={watchlistSummaries}
+            countries={countries}
+            watchedCountryCodes={watchedCountryCodes}
+            onAddCountry={(code) => {
+              addWatchedCountry(code);
+              setSelectedCountry(code);
+            }}
+            onRemoveCountry={removeWatchedCountry}
+            onSelectCountry={(code) => setSelectedCountry(code)}
+            onClose={() => setPanelVisibility((prev) => ({ ...prev, watchlist: false }))}
+          />
+        )}
 
-        {filter.norwayLens && activeStep.mode === "history" && <NorwayRiskCard days={filter.days} />}
+        {panelVisibility.norwayRisk && filter.norwayLens && activeStep.mode === "history" && <NorwayRiskCard days={filter.days} onClose={() => setPanelVisibility((prev) => ({ ...prev, norwayRisk: false }))} />}
 
         {selectedCountry && (
           <DrawerPanel

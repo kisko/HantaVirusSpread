@@ -25,6 +25,8 @@ export interface SignalRecord {
   /** A = official agency; B = science summary; C = credible media; D = other */
   sourceTier: "A" | "B" | "C" | "D";
   confidence: "signal";
+  /** Optional region/province/state information for more accurate localization */
+  region?: string;
 }
 
 export interface CountryMeta {
@@ -167,6 +169,15 @@ export interface ForecastSnapshot {
 }
 
 export type DrawerTab = "overview" | "trend" | "signals" | "events";
+
+export type PanelVisibilityKey = "legend" | "watchlist" | "norwayRisk" | "overview";
+
+export interface PanelVisibility {
+  legend: boolean;
+  watchlist: boolean;
+  norwayRisk: boolean;
+  overview: boolean;
+}
 
 export interface DrawerState {
   open: boolean;

@@ -83,10 +83,18 @@ export default function SourcesList({ confirmed, signals }: SourcesListProps) {
                     </div>
                   </div>
                   <p className="mb-1 text-xs leading-relaxed text-slate-200">{s.snippet}</p>
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
                     <span className="text-xs text-slate-300">{s.sourceOrg}</span>
                     <span className="text-xs text-slate-500">·</span>
                     <span className="text-xs text-slate-300">{s.date}</span>
+                    {s.region && (
+                      <>
+                        <span className="text-xs text-slate-500">·</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-200 border border-orange-400/40">
+                          📍 {s.region}
+                        </span>
+                      </>
+                    )}
                   </div>
                   <a
                     href={s.sourceUrl}

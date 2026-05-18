@@ -1,4 +1,7 @@
-import type { DaysFilter, MapFilter } from "@/types";
+"use client";
+
+import { useState } from "react";
+import type { DaysFilter, MapFilter, PanelVisibility } from "@/types";
 
 interface TopBarProps {
   filter: MapFilter;
@@ -8,6 +11,8 @@ interface TopBarProps {
   countryNames: string[];
   onCountrySelect: (code: string) => void;
   countryNameToCode: Record<string, string>;
+  panelVisibility: PanelVisibility;
+  onPanelVisibilityChange: (panel: keyof PanelVisibility, visible: boolean) => void;
 }
 
 const DAY_OPTIONS: DaysFilter[] = [7, 30, 365];
@@ -20,6 +25,8 @@ export default function TopBar({
   countryNames,
   onCountrySelect,
   countryNameToCode,
+  panelVisibility,
+  onPanelVisibilityChange,
 }: TopBarProps) {
   const filtered =
     searchQuery.trim().length > 0
@@ -146,6 +153,9 @@ export default function TopBar({
           color="bg-emerald-600"
         />
 
+        {/* Panel visibility menu */}
+        <PanelVisibilityMenu panelVisibility={panelVisibility} onPanelVisibilityChange={onPanelVisibilityChange} />
+
         {/* Nav links */}
         <nav className="ml-auto flex gap-2 text-xs" aria-label="Site navigation">
           <a
@@ -172,6 +182,57 @@ interface ToggleChipProps {
   checked: boolean;
   onChange: (v: boolean) => void;
   color: string;
+}
+
+interface PanelVisibilityMenuProps {
+  panelVisibility: PanelVisibility;
+  onPanelVisibilityChange: (panel: keyof PanelVisibility, visible: boolean) => void;
+}
+
+function PanelVisibilityMenu({ panelVisibility, onPanelVisibilityChange }: PanelVisibilityMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const panels: { key: keyof PanelVisibility; label: string }[] = [
+    { key: "overview", label: "Overview Panel" },
+    { key: "legend", label: "Legend" },
+    { key: "watchlist", label: "Watchlist" },
+    { key: "norwayRisk", label: "Norway Risk" },
+  ];
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="relative z-[999999] rounded-full border border-slate-600/80 bg-slate-900/75 px-3 py-1 text-xs font-semibold text-slate-300 hover:border-cyan-300/60 hover:text-cyan-200 transition-colors flex items-center gap-1.5"
+        aria-label="Panel visibility"
+        aria-expanded={isOpen}
+        title="Show/hide panels"
+      >
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+          <path d="M8 2a1 1 0 100 2 1 1 0 000-2zm0 5a1 1 0 100 2 1 1 0 000-2zm0 5a1 1 0 100 2 1 1 0 000-2z" />
+        </svg>
+        Panels
+      </button>
+      {isOpen && (
+        <div className="absolute top-full mt-2 right-0 z-[999999] rounded-lg border border-slate-600/60 bg-slate-950/95 shadow-xl p-2 min-w-[180px]">
+          {panels.map(({ key, label }) => (
+            <label
+              key={key}
+              className="flex items-center gap-2 px-3 py-2 cursor-pointer rounded-md hover:bg-cyan-400/10 text-xs text-slate-200 transition-colors"
+            >
+              <input
+                type="checkbox"
+                checked={panelVisibility[key]}
+                onChange={(e) => onPanelVisibilityChange(key, e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-slate-500 bg-slate-900 text-cyan-400 focus:ring-cyan-400"
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ToggleChip({ id, label, checked, onChange, color }: ToggleChipProps) {

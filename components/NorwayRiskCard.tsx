@@ -5,9 +5,10 @@ import type { NorwayRiskResponse } from "@/types";
 
 interface NorwayRiskCardProps {
   days: number;
+  onClose?: () => void;
 }
 
-export default function NorwayRiskCard({ days }: NorwayRiskCardProps) {
+export default function NorwayRiskCard({ days, onClose }: NorwayRiskCardProps) {
   const [data, setData] = useState<NorwayRiskResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,14 +74,29 @@ export default function NorwayRiskCard({ days }: NorwayRiskCardProps) {
             Heuristic indicator — NOT a prediction
           </p>
         </div>
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="text-xs text-cyan-200 hover:underline"
-          aria-expanded={expanded}
-          aria-controls="norway-risk-details"
-        >
-          {expanded ? "Less" : "More"}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs text-cyan-200 hover:underline"
+            aria-expanded={expanded}
+            aria-controls="norway-risk-details"
+          >
+            {expanded ? "Less" : "More"}
+          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Hide Norway risk panel"
+              title="Hide Norway risk panel"
+              className="flex h-5 w-5 items-center justify-center rounded-full border border-cyan-300/35 text-cyan-100 transition hover:bg-red-500/30 bg-cyan-400/14 hover:border-red-400/60"
+            >
+              <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden="true">
+                <path d="M12.207 3.793L8.707 7.293l3.5 3.5-.707.707L8 8.707l-3.5 3.5-.707-.707 3.5-3.5-3.5-3.5.707-.707L8 7.293l3.5-3.5.707.707Z" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Risk gauge */}
